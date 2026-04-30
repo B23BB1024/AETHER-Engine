@@ -11,53 +11,34 @@
 
   <canvas id="grain-canvas"></canvas>
 
+  <!-- HUD -->
   <div id="hud">
     <div id="hud-logo">⬡ AETHER</div>
     <div id="hud-status">
       <span id="mood-label">MOOD: <strong id="mood-name">DEFAULT</strong></span>
-      <div id="terminal-output" style="margin-top: 15px; font-family: monospace; color: #00eeff; font-size: 0.9em; line-height: 1.4; max-width: 350px; text-shadow: 0 0 5px #00eeff;">
+      <!-- AI RESPONSE TERMINAL -->
+      <div id="terminal-output" style="margin-top: 15px; font-family: monospace; color: #00eeff; font-size: 0.85em; line-height: 1.4; max-width: 320px; text-transform: uppercase; letter-spacing: 1px;">
         SYSTEM READY...
       </div>
     </div>
   </div>
 
+  <!-- Mood Controls -->
   <div id="controls">
-    <button class="mood-btn" id="btn-default" onclick="setMood('Default')">◈ DEFAULT</button>
+    <button class="mood-btn" id="btn-default"   onclick="setMood('Default')">◈ DEFAULT</button>
     <button class="mood-btn" id="btn-discipline" onclick="setMood('Discipline')">◉ DISCIPLINE</button>
-    <button class="mood-btn" id="btn-nostalgia" onclick="setMood('Nostalgia')">◎ NOSTALGIA</button>
+    <button class="mood-btn" id="btn-nostalgia"  onclick="setMood('Nostalgia')">◎ NOSTALGIA</button>
   </div>
 
   <div id="scanlines"></div>
 
   <script>
-  // ── CONFIGURATION ───────────────────────────
+  // ── AI CONFIGURATION ────────────────────────
   const PIPEDREAM_URL = "https://eokta6nzy6c0t3m.m.pipedream.net/"; 
 
-  // ── THREE.JS CORE ───────────────────────────
-  const W = window.innerWidth, H = window.innerHeight;
-  const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x000814, 0.035);
-  const camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 300);
-  camera.position.set(0, 3.5, 11);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(W, H);
-  renderer.setClearColor(0x000814);
-  document.body.appendChild(renderer.domElement);
-
-  // Lights & Orb (Your existing setup)
-  const orbGroup = new THREE.Group();
-  scene.add(orbGroup);
-  const coreGeo = new THREE.SphereGeometry(0.72, 32, 32);
-  const coreMat = new THREE.MeshStandardMaterial({ color: 0x00ccff, emissive: 0x00eeff, emissiveIntensity: 2.5 });
-  const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-  orbGroup.add(coreMesh);
-  
-  const orbLight = new THREE.PointLight(0x00eeff, 4, 25);
-  scene.add(orbLight);
-
-  // ── AI INTEGRATION ──────────────────────────
   async function triggerAether(mood) {
     const output = document.getElementById('terminal-output');
+    output.style.opacity = "0.5";
     output.innerText = "> INITIALIZING UPLINK...";
     
     try {
@@ -66,17 +47,46 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mood: mood })
       });
-      
-      const aiResponse = await response.text();
-      // Typewriter effect or instant reveal
-      output.innerText = aiResponse;
+      const aiText = await response.text();
+      output.style.opacity = "1";
+      output.innerText = aiText;
     } catch (err) {
-      output.innerText = "> ERROR: UPLINK FAILED.";
-      console.error(err);
+      output.innerText = "> ERROR: CONNECTION SEVERED.";
     }
   }
 
-  // ── MOOD LOGIC ──────────────────────────────
+  // ── THREE.JS CORE (Your High-Detail Version) ──
+  const W = window.innerWidth, H = window.innerHeight;
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000814, 0.035);
+
+  const camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 300);
+  camera.position.set(0, 3.5, 11);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(W, H);
+  renderer.setClearColor(0x000814);
+  document.body.appendChild(renderer.domElement);
+
+  // Lights
+  const orbLight = new THREE.PointLight(0x00eeff, 4, 25);
+  scene.add(orbLight);
+  scene.add(new THREE.AmbientLight(0x0a0a1a, 1));
+
+  // Neural Orb Group
+  const orbGroup = new THREE.Group();
+  scene.add(orbGroup);
+
+  // Core & Rings (Your setup)
+  const coreMat = new THREE.MeshStandardMaterial({ color: 0x00ccff, emissive: 0x00eeff, emissiveIntensity: 2.5 });
+  const coreMesh = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 32), coreMat);
+  orbGroup.add(coreMesh);
+
+  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.025, 16, 120), new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 3 }));
+  ring1.rotation.x = Math.PI / 3;
+  orbGroup.add(ring1);
+
+  // ── Mood State & Logic ──────────────────────
   let moodState = {
     current: 'Default',
     rotSpeed: 0.0035,
@@ -89,38 +99,45 @@
     moodState.current = mood;
     document.getElementById('mood-name').textContent = mood.toUpperCase();
 
+    const grain = document.getElementById('grain-canvas');
+
     if (mood === 'Discipline') {
       document.getElementById('btn-discipline').classList.add('active');
       moodState.rotSpeed = 0.012;
       moodState.targetColor = new THREE.Color(0x0044ff);
-      moodState.targetPulse = 0.65;
-      document.body.classList.add('discipline');
-      document.body.classList.remove('nostalgia');
+      scene.fog.color.set(0x000520);
+      grain.style.display = 'none';
     } else if (mood === 'Nostalgia') {
       document.getElementById('btn-nostalgia').classList.add('active');
       moodState.rotSpeed = 0.0008;
       moodState.targetColor = new THREE.Color(0xb06020);
-      moodState.targetPulse = 0.18;
-      document.body.classList.add('nostalgia');
-      document.body.classList.remove('discipline');
+      scene.fog.color.set(0x1a0d00);
+      grain.style.display = 'block';
     } else {
       document.getElementById('btn-default').classList.add('active');
       moodState.rotSpeed = 0.0035;
       moodState.targetColor = new THREE.Color(0x00ccff);
-      moodState.targetPulse = 0.4;
-      document.body.classList.remove('nostalgia', 'discipline');
+      scene.fog.color.set(0x000814);
+      grain.style.display = 'none';
     }
 
-    // Call the AI
+    // TRIGGER AI
     triggerAether(mood);
   }
 
-  // ── ANIMATION LOOP ──────────────────────────
+  // ── Animation Loop ──────────────────────────
   function animate() {
     requestAnimationFrame(animate);
     let time = Date.now() * 0.001;
+    
     orbGroup.rotation.y += moodState.rotSpeed;
     coreMat.color.lerp(moodState.targetColor, 0.05);
+    orbLight.color.lerp(moodState.targetColor, 0.05);
+    
+    // Pulse effect
+    const pulse = 1 + Math.sin(time * 1.5) * 0.2;
+    coreMat.emissiveIntensity = 2.5 * pulse;
+    
     renderer.render(scene, camera);
   }
   animate();
