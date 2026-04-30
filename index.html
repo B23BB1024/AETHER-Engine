@@ -11,19 +11,16 @@
 
   <canvas id="grain-canvas"></canvas>
 
-  <!-- HUD -->
   <div id="hud">
     <div id="hud-logo">⬡ AETHER</div>
     <div id="hud-status">
       <span id="mood-label">MOOD: <strong id="mood-name">DEFAULT</strong></span>
-      <!-- AI RESPONSE TERMINAL -->
       <div id="terminal-output" style="margin-top: 15px; font-family: monospace; color: #00eeff; font-size: 0.85em; line-height: 1.4; max-width: 320px; text-transform: uppercase; letter-spacing: 1px;">
         SYSTEM READY...
       </div>
     </div>
   </div>
 
-  <!-- Mood Controls -->
   <div id="controls">
     <button class="mood-btn" id="btn-default"   onclick="setMood('Default')">◈ DEFAULT</button>
     <button class="mood-btn" id="btn-discipline" onclick="setMood('Discipline')">◉ DISCIPLINE</button>
@@ -55,16 +52,18 @@
     }
   }
 
-  // ── THREE.JS CORE (Your High-Detail Version) ──
+  // ── THREE.JS CORE ───────────────────────────
   const W = window.innerWidth, H = window.innerHeight;
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x000814, 0.035);
 
   const camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 300);
   camera.position.set(0, 3.5, 11);
+  camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000814);
   document.body.appendChild(renderer.domElement);
 
@@ -73,24 +72,54 @@
   scene.add(orbLight);
   scene.add(new THREE.AmbientLight(0x0a0a1a, 1));
 
-  // Neural Orb Group
+  // ── Neural Orb (High Detail) ────────────────
   const orbGroup = new THREE.Group();
   scene.add(orbGroup);
 
-  // Core & Rings (Your setup)
+  // Core & Shell
   const coreMat = new THREE.MeshStandardMaterial({ color: 0x00ccff, emissive: 0x00eeff, emissiveIntensity: 2.5 });
   const coreMesh = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 32), coreMat);
   orbGroup.add(coreMesh);
 
-  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.025, 16, 120), new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 3 }));
-  ring1.rotation.x = Math.PI / 3;
-  orbGroup.add(ring1);
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x001122, emissive: 0x002244, emissiveIntensity: 0.3, metalness: 0.2, roughness: 0.05, transmission: 0.85, thickness: 1.8, transparent: true, opacity: 0.55 });
+  orbGroup.add(new THREE.Mesh(new THREE.SphereGeometry(1.6, 64, 64), glassMat));
+
+  // Particle Halo
+  const pPositions = new Float32Array(1800 * 3);
+  for (let i = 0; i < 1800 * 3; i++) pPositions[i] = (Math.random() - 0.5) * 10;
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+  const pMat = new THREE.PointsMaterial({ color: 0x00eeff, size: 0.04, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
+  const particles = new THREE.Points(pGeo, pMat);
+  orbGroup.add(particles);
+
+  // ── Neon Grid Floor ──────────────────────────
+  const gridHelper = new THREE.GridHelper(200, 60, 0x003366, 0x001133);
+  gridHelper.position.y = -2.5;
+  scene.add(gridHelper);
+
+  // ── Film Grain (Nostalgia) ───────────────────
+  const grainCanvas = document.getElementById('grain-canvas');
+  const grainCtx = grainCanvas.getContext('2d');
+  function drawGrain() {
+    if (!grainCanvas.classList.contains('visible')) return;
+    const imageData = grainCtx.createImageData(grainCanvas.width, grainCanvas.height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const v = Math.random() * 255 * 0.18 | 0;
+      data[i] = data[i+1] = data[i+2] = v;
+      data[i+3] = Math.random() > 0.5 ? 40 : 0;
+    }
+    grainCtx.putImageData(imageData, 0, 0);
+    requestAnimationFrame(drawGrain);
+  }
 
   // ── Mood State & Logic ──────────────────────
   let moodState = {
     current: 'Default',
     rotSpeed: 0.0035,
     targetColor: new THREE.Color(0x00ccff),
+    targetEmissive: new THREE.Color(0x00eeff),
     targetPulse: 0.4,
   };
 
@@ -98,55 +127,58 @@
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
     moodState.current = mood;
     document.getElementById('mood-name').textContent = mood.toUpperCase();
-
     const grain = document.getElementById('grain-canvas');
 
     if (mood === 'Discipline') {
       document.getElementById('btn-discipline').classList.add('active');
       moodState.rotSpeed = 0.012;
       moodState.targetColor = new THREE.Color(0x0044ff);
+      moodState.targetEmissive = new THREE.Color(0x0088ff);
       scene.fog.color.set(0x000520);
-      grain.style.display = 'none';
+      grain.classList.remove('visible');
     } else if (mood === 'Nostalgia') {
       document.getElementById('btn-nostalgia').classList.add('active');
       moodState.rotSpeed = 0.0008;
       moodState.targetColor = new THREE.Color(0xb06020);
+      moodState.targetEmissive = new THREE.Color(0xd08040);
       scene.fog.color.set(0x1a0d00);
-      grain.style.display = 'block';
+      grain.classList.add('visible');
+      drawGrain();
     } else {
       document.getElementById('btn-default').classList.add('active');
       moodState.rotSpeed = 0.0035;
       moodState.targetColor = new THREE.Color(0x00ccff);
+      moodState.targetEmissive = new THREE.Color(0x00eeff);
       scene.fog.color.set(0x000814);
-      grain.style.display = 'none';
+      grain.classList.remove('visible');
     }
-
-    // TRIGGER AI
     triggerAether(mood);
   }
 
   // ── Animation Loop ──────────────────────────
+  let clock = 0;
   function animate() {
     requestAnimationFrame(animate);
-    let time = Date.now() * 0.001;
-    
+    clock += 0.016;
     orbGroup.rotation.y += moodState.rotSpeed;
     coreMat.color.lerp(moodState.targetColor, 0.05);
-    orbLight.color.lerp(moodState.targetColor, 0.05);
-    
-    // Pulse effect
-    const pulse = 1 + Math.sin(time * 1.5) * 0.2;
+    coreMat.emissive.lerp(moodState.targetEmissive, 0.05);
+    const pulse = 1 + Math.sin(clock * 1.5) * 0.2;
     coreMat.emissiveIntensity = 2.5 * pulse;
-    
+    orbLight.intensity = 4.0 * pulse;
+    gridHelper.position.z = (clock * 0.8) % 3.33;
     renderer.render(scene, camera);
   }
   animate();
 
   window.addEventListener('resize', () => {
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    grainCanvas.width = w; grainCanvas.height = h;
   });
+  setMood('Default');
   </script>
 </body>
 </html>
